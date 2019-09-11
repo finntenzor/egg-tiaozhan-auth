@@ -69,7 +69,12 @@ function buildProcessCallback(callback: GuardCallback, builder: MessageBuilder):
     const auth = route ? getAuthFromRoute(route) : null;
     const result = callback(ctx, auth, builder(ctx));
     if (result instanceof Promise) {
-      await result;
+      const body = await result;
+      if (body !== undefined) {
+        ctx.body = body;
+      }
+    } else if (result !== undefined) {
+      ctx.body = result;
     }
   };
 }
@@ -84,7 +89,12 @@ function buildProcessMiddleware(middlwareStrategy: GuardMiddlewareStrategy): Aut
     const auth = route ? getAuthFromRoute(route) : null;
     const result = middlwareStrategy(ctx, auth, next);
     if (result instanceof Promise) {
-      await result;
+      const body = await result;
+      if (body !== undefined) {
+        ctx.body = body;
+      }
+    } else if (result !== undefined) {
+      ctx.body = result;
     }
   };
 }
@@ -158,28 +168,22 @@ function buildAllProcess(options: TiaozhanAuthConfig): AllAuthMiddlewareProcess 
  */
 export function buildMiddleware(options: TiaozhanAuthConfig) {
   const process = buildAllProcess(options);
-  return async function tiaozhanAuthMiddleware(ctx: Context, next: () => Promise<any>): Promise<void> {
+  return function tiaozhanAuthMiddleware(ctx: Context, next: () => Promise<any>): Promise<void> {
     // 如果配置要求跳过权限检查，直接通过
     if (options.skip) {
-      await next();
-      return;
+      return next();
     }
     switch (checkCanPass(options, ctx)) {
       case GuardStatus.PASS:
-        await process.onPass(ctx, next);
-        break;
+        return process.onPass(ctx, next);
       case GuardStatus.MISS_ROUTE:
-        await process.onMissRoute(ctx, next);
-        break;
+        return process.onMissRoute(ctx, next);
       case GuardStatus.NOT_LOGIN:
-        await process.onNotLogin(ctx, next);
-        break;
+        return process.onNotLogin(ctx, next);
       case GuardStatus.INVALID_SYMBOL:
-        await process.onInvalidSymbol(ctx, next);
-        break;
+        return process.onInvalidSymbol(ctx, next);
       case GuardStatus.NO_PERMISSION:
-        await process.onNoPermission(ctx, next);
-        break;
+        return process.onNoPermission(ctx, next);
     }
   };
 }
