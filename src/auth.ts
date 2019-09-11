@@ -1,16 +1,6 @@
 import { Context, TiaozhanAuthConfig } from 'egg';
 import { checkCanPass, GuardStatus, AuthError } from './check';
-import {
-  GuardCommonStrategy,
-  GuardMissRouteStrategy,
-  GuardNotLoginStrategy,
-  GuardInvalidSymbolStrategy,
-  GuardNoPermissionStrategy,
-  GuardAllStrategy,
-  GuardStrategyCallback,
-  GuardMessageBuilder,
-  AuthOptions
-} from './types';
+import { GuardStrategy, GuardCallback, GuardMiddlewareStrategy, GuardMessageBuilder } from './types';
 import { getAuthFromRoute } from './attr-service';
 import { Route } from 'egg-tiaozhan-controller-extension';
 
@@ -30,9 +20,9 @@ interface AllAuthMiddlewareProcess {
   onInvalidSymbol: AuthMiddlewareProcess;
   onNoPermission: AuthMiddlewareProcess;
 }
-type MessageBuilderType = 'MissRoute' | 'NotLogin' | 'InvalidSymbol' | 'NoPermission';
+// type MessageBuilderType = 'MissRoute' | 'NotLogin' | 'InvalidSymbol' | 'NoPermission';
 
-const defaultMessageBuilder: AllMessageBuilder = {
+const allDefaultMessageBuilder: AllMessageBuilder = {
   onPass: (_: Context) => 'Auth pass',
   onMissRoute: (ctx: Context) => `request [${ctx.request.path}] has no route!`,
   onNotLogin: (_: Context) => 'You are not logined!',
@@ -73,9 +63,11 @@ function buildProcessThrow(builder: MessageBuilder): AuthMiddlewareProcess {
  * @param callback 自定义callback
  * @param builder MessageBuilder
  */
-function buildProcessCallback(callback: GuardStrategyCallback, builder: MessageBuilder): AuthMiddlewareProcess {
+function buildProcessCallback(callback: GuardCallback, builder: MessageBuilder): AuthMiddlewareProcess {
   return async (ctx: Context, _: () => Promise<any>) => {
-    const result = callback(ctx, builder(ctx));
+    const route = ctx.currentRoute;
+    const auth = route ? getAuthFromRoute(route) : null;
+    const result = callback(ctx, auth, builder(ctx));
     if (result instanceof Promise) {
       await result;
     }
@@ -83,81 +75,32 @@ function buildProcessCallback(callback: GuardStrategyCallback, builder: MessageB
 }
 
 /**
- * 将message配置项格式化为MessageBuilder
- * @param message message配置项
- * @param defaultBuilder 默认builder
+ * 创建一个Middlware处理逻辑
+ * @param middlwareStrategy 处理策略
  */
-function formatMessageBuilder(message: GuardMessageBuilder | void, type: MessageBuilderType): MessageBuilder {
-  let builder: MessageBuilder;
-  if (typeof message === 'string') {
-    builder = (_: Context) => message;
-  } else if (typeof message === 'function') {
-    switch (type) {
-      default:
-      case 'MissRoute':
-      case 'NotLogin':
-        builder = message as MessageBuilder;
-        break;
-      case 'InvalidSymbol':
-        builder = (ctx: Context) => {
-          const route = ctx.currentRoute as Route;
-          const auth = getAuthFromRoute(route) as symbol;
-          return (message as ((ctx: Context, auth: symbol) => string))(ctx, auth);
-        };
-        break;
-      case 'NoPermission':
-        builder = (ctx: Context) => {
-          const route = ctx.currentRoute;
-          const auth = route ? getAuthFromRoute(route) : null;
-          return (message as ((ctx: Context, route: Route | null, auth: AuthOptions | null, user: any) => string))(ctx, route, auth, ctx.user);
-        };
-        break;
+function buildProcessMiddleware(middlwareStrategy: GuardMiddlewareStrategy): AuthMiddlewareProcess {
+  return async (ctx: Context, next: () => Promise<any>) => {
+    const route = ctx.currentRoute;
+    const auth = route ? getAuthFromRoute(route) : null;
+    const result = middlwareStrategy(ctx, auth, next);
+    if (result instanceof Promise) {
+      await result;
     }
-  } else {
-    switch (type) {
-      case 'MissRoute':
-        builder = defaultMessageBuilder.onMissRoute;
-        break;
-      case 'NotLogin':
-        builder = defaultMessageBuilder.onNotLogin;
-        break;
-      case 'InvalidSymbol':
-        builder = defaultMessageBuilder.onInvalidSymbol;
-        break;
-      default:
-      case 'NoPermission':
-        builder = defaultMessageBuilder.onNoPermission;
-        break;
-    }
-  }
-  return builder;
+  };
 }
 
 /**
- * 创建通用处理逻辑，接受pass、log、throw或者回调，否则返回null
- * @param strategy 守护策略
- * @param messageBuilder MessageBuilder
+ * 将message配置项格式化为MessageBuilder或null
+ * @param message message配置项
  */
-function buildCommonProcess(strategy: GuardCommonStrategy, messageBuilder: MessageBuilder): AuthMiddlewareProcess;
-function buildCommonProcess(strategy: GuardCommonStrategy | GuardMissRouteStrategy, messageBuilder: MessageBuilder): AuthMiddlewareProcess | null;
-function buildCommonProcess(strategy: GuardCommonStrategy | GuardNotLoginStrategy, messageBuilder: MessageBuilder): AuthMiddlewareProcess | null;
-function buildCommonProcess(strategy: GuardCommonStrategy | GuardInvalidSymbolStrategy, messageBuilder: MessageBuilder): AuthMiddlewareProcess | null;
-function buildCommonProcess(strategy: GuardCommonStrategy | GuardNoPermissionStrategy, messageBuilder: MessageBuilder): AuthMiddlewareProcess | null;
-function buildCommonProcess(strategy: GuardAllStrategy, messageBuilder: MessageBuilder): AuthMiddlewareProcess | null {
-  if (strategy === 'pass') {
-    return processPass;
-  } else if (strategy === 'log') {
-    return buildProcessLog(messageBuilder);
-  } else if (strategy === 'throw') {
-    return buildProcessThrow(messageBuilder);
-  } else if (typeof strategy === 'function') {
-    return async (ctx: Context, next: () => Promise<any>) => {
+function formatMessageBuilder(message: GuardMessageBuilder | void): MessageBuilder | null {
+  if (typeof message === 'string') {
+    return (_: Context) => message;
+  } else if (typeof message === 'function') {
+    return (ctx: Context) => {
       const route = ctx.currentRoute;
       const auth = route ? getAuthFromRoute(route) : null;
-      const result = strategy(ctx, route, auth, ctx.user || null, next);
-      if (result instanceof Promise) {
-        await result;
-      }
+      return message(ctx, auth);
     };
   } else {
     return null;
@@ -165,44 +108,47 @@ function buildCommonProcess(strategy: GuardAllStrategy, messageBuilder: MessageB
 }
 
 /**
- * 创建分支处理逻辑，接受四种分支逻辑
- * @param strategy 守护逻辑
- * @param type 分支类型
+ * 创建处理逻辑，接受pass、log、throw、middleware、commonStrategy或CallbackStrategy
+ * @param strategy 守护策略
+ * @param defaultMessageBuilder MessageBuilder
  */
-function buildBranchProcess(strategy: GuardMissRouteStrategy | GuardNotLoginStrategy | GuardInvalidSymbolStrategy | GuardNoPermissionStrategy, type: MessageBuilderType): AuthMiddlewareProcess {
-  const builder = formatMessageBuilder(strategy.message, 'MissRoute');
-  switch (strategy.type) {
-    case 'pass':
-      return processPass;
-    case 'log':
-      return buildProcessLog(builder);
-    case 'throw':
-      return buildProcessThrow(builder);
-    case 'callback':
+function buildProcess(strategy: GuardStrategy, defaultMessageBuilder: MessageBuilder): AuthMiddlewareProcess {
+  if (strategy === 'pass') {
+    return processPass;
+  } else if (strategy === 'log') {
+    return buildProcessLog(defaultMessageBuilder);
+  } else if (strategy === 'throw') {
+    return buildProcessThrow(defaultMessageBuilder);
+  } else if (typeof strategy === 'function') {
+    return buildProcessMiddleware(strategy);
+  } else if (strategy.type === 'callback') {
+    return buildProcessCallback(strategy.callback, defaultMessageBuilder);
+  } else {
+    const builder = formatMessageBuilder(strategy.message) || defaultMessageBuilder;
+    if (strategy.callback) {
       return buildProcessCallback(strategy.callback, builder);
+    } else {
+      if (strategy.type === 'pass') {
+        return processPass;
+      } else if (strategy.type === 'log') {
+        return buildProcessLog(builder);
+      } else if (strategy.type === 'throw') {
+        return buildProcessThrow(builder);
+      } else {
+        throw new AuthError('Unexpected strategy');
+      }
+    }
   }
 }
 
 function buildAllProcess(options: TiaozhanAuthConfig): AllAuthMiddlewareProcess {
   const process = {
-    onPass: buildCommonProcess(options.onPass, defaultMessageBuilder.onPass),
-    onMissRoute: buildCommonProcess(options.onMissRoute, defaultMessageBuilder.onMissRoute),
-    onNotLogin: buildCommonProcess(options.onNotLogin, defaultMessageBuilder.onNotLogin),
-    onInvalidSymbol: buildCommonProcess(options.onInvalidSymbol, defaultMessageBuilder.onInvalidSymbol),
-    onNoPermission: buildCommonProcess(options.onNoPermission, defaultMessageBuilder.onNoPermission),
+    onPass: buildProcess(options.onPass, allDefaultMessageBuilder.onPass),
+    onMissRoute: buildProcess(options.onMissRoute, allDefaultMessageBuilder.onMissRoute),
+    onNotLogin: buildProcess(options.onNotLogin, allDefaultMessageBuilder.onNotLogin),
+    onInvalidSymbol: buildProcess(options.onInvalidSymbol, allDefaultMessageBuilder.onInvalidSymbol),
+    onNoPermission: buildProcess(options.onNoPermission, allDefaultMessageBuilder.onNoPermission),
   };
-  if (process.onMissRoute === null) {
-    process.onMissRoute = buildBranchProcess(options.onMissRoute as GuardMissRouteStrategy, 'MissRoute');
-  }
-  if (process.onNotLogin === null) {
-    process.onNotLogin = buildBranchProcess(options.onNotLogin as GuardNotLoginStrategy, 'NotLogin');
-  }
-  if (process.onInvalidSymbol === null) {
-    process.onInvalidSymbol = buildBranchProcess(options.onInvalidSymbol as GuardInvalidSymbolStrategy, 'InvalidSymbol');
-  }
-  if (process.onNoPermission === null) {
-    process.onNoPermission = buildBranchProcess(options.onNoPermission as GuardNoPermissionStrategy, 'NoPermission');
-  }
   return process as AllAuthMiddlewareProcess;
 }
 

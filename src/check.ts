@@ -1,6 +1,6 @@
 import { AuthCheckOptions } from './types';
 import { TiaozhanAuthConfig, Context } from 'egg';
-import { getAuthFromRoute } from '.';
+import { getAuthFromRoute } from './attr-service';
 
 /**
  * 仅登录即可通过的权限配置

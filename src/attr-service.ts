@@ -1,4 +1,4 @@
-import 'reflect-metadata/index';
+import 'reflect-metadata';
 import { AuthOptions } from './types';
 import { Route } from 'egg-tiaozhan-controller-extension';
 
