@@ -1,5 +1,8 @@
 'use strict';
 
+const HomeController = require('./fixtures/apps/main/app/controller/home');
+const tiaozhanAuth = require('../dist');
+
 class Dependency {
   constructor() {
     this.status = {};
@@ -9,8 +12,16 @@ class Dependency {
     const status = this.status;
     // tslint:disable-next-line: ter-prefer-arrow-callback
     before(function() {
-      if (!status[key]) {
-        this.skip();
+      if (typeof key === 'string') {
+        if (!status[key]) {
+          this.skip();
+        }
+      } else {
+        for (const k of key) {
+          if (!status[k]) {
+            this.skip();
+          }
+        }
       }
     });
   }
@@ -50,3 +61,23 @@ const checkCases = [
 ];
 
 exports.checkCases = checkCases;
+
+const fackRoute = {
+  Controller: HomeController,
+  methodName: 'index',
+};
+
+const staticMiddlwareCases = [
+  [{ currentRoute: null }, null, 'onMissRoute' ],
+  [{ currentRoute: fackRoute }, null, 'onPass' ],
+  [{ currentRoute: fackRoute, isAuthenticated: () => true }, tiaozhanAuth.LOGIN, 'onPass' ],
+  [{ currentRoute: fackRoute, isAuthenticated: () => false }, tiaozhanAuth.LOGIN, 'onNotLogin' ],
+  [{ currentRoute: fackRoute }, Symbol('hello'), 'onInvalidSymbol' ],
+  [{ currentRoute: fackRoute, isAuthenticated: () => false }, 'read', 'onNotLogin' ],
+  [{ currentRoute: fackRoute, isAuthenticated: () => true, user: { permissions: [ 'read' ] } }, 'read', 'onPass' ],
+  [{ currentRoute: fackRoute, isAuthenticated: () => true, user: { permissions: [ ] } }, 'read', 'onNoPermission' ],
+];
+
+exports.staticMiddlwareCases = staticMiddlwareCases;
+
+exports.dep = new Dependency();

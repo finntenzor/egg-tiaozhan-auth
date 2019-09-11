@@ -12,7 +12,6 @@ export declare type GuardMessageBuilder = string | ((ctx: Context, auth: AuthOpt
 export interface GuardCommonStrategy {
   type: GuardSimpleStrategy;
   message?: GuardMessageBuilder;
-  callback?: GuardCallback;
 }
 export interface GuardCallbackStrategy {
   type: 'callback';

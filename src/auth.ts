@@ -145,28 +145,25 @@ function buildProcess(strategy: GuardStrategy, defaultMessageBuilder: MessageBui
   } else if (typeof strategy === 'function') {
     return buildProcessMiddleware(strategy);
   } else if (strategy.type === 'callback') {
-    return buildProcessCallback(strategy.callback, defaultMessageBuilder);
+    const builder = formatMessageBuilder(strategy.message) || defaultMessageBuilder;
+    return buildProcessCallback(strategy.callback, builder);
   } else {
     const builder = formatMessageBuilder(strategy.message) || defaultMessageBuilder;
-    if (strategy.callback) {
-      return buildProcessCallback(strategy.callback, builder);
+    if (strategy.type === 'pass') {
+      return processPass;
+    } else if (strategy.type === 'log') {
+      return buildProcessLog(builder);
+    } else if (strategy.type === 'throw') {
+      return buildProcessThrow(builder);
+    } else if (strategy.type === 'abort') {
+      return buildProcessAbort(builder, defaultStatus);
     } else {
-      if (strategy.type === 'pass') {
-        return processPass;
-      } else if (strategy.type === 'log') {
-        return buildProcessLog(builder);
-      } else if (strategy.type === 'throw') {
-        return buildProcessThrow(builder);
-      } else if (strategy.type === 'abort') {
-        return buildProcessAbort(builder, defaultStatus);
-      } else {
-        throw new AuthError('Unexpected strategy');
-      }
+      throw new AuthError('Unexpected strategy');
     }
   }
 }
 
-function buildAllProcess(options: TiaozhanAuthConfig): AllAuthMiddlewareProcess {
+export function buildAllProcess(options: TiaozhanAuthConfig): AllAuthMiddlewareProcess {
   const process = {
     onPass: buildProcess(options.onPass, allDefaultMessageBuilder.onPass),
     onMissRoute: buildProcess(options.onMissRoute, allDefaultMessageBuilder.onMissRoute),
