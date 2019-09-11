@@ -28,3 +28,25 @@ class Dependency {
 }
 
 exports.Dependency = Dependency;
+
+const checkCases = [
+  [[ 'read' ], 'read', true ],
+  [[], 'read', false ],
+  [[ 'read', 'write' ], [ 'read', 'write' ], true ],
+  [[ 'read' ], [ 'read', 'write' ], false ],
+  [[ 'write' ], [ 'read', 'write' ], false ],
+  [[], [ 'read', 'write' ], false ],
+  [[ 'read' ], can => can('read') || can('write'), true ],
+  [[ 'write' ], can => can('read') || can('write'), true ],
+  [[], can => can('read') || can('write'), false ],
+  [[ ], can => can([ 'read', 'write' ]) || can('edit'), false ],
+  [[ 'read' ], can => can([ 'read', 'write' ]) || can('edit'), false ],
+  [[ 'write' ], can => can([ 'read', 'write' ]) || can('edit'), false ],
+  [[ 'edit' ], can => can([ 'read', 'write' ]) || can('edit'), true ],
+  [[ 'read', 'write' ], can => can([ 'read', 'write' ]) || can('edit'), true ],
+  [[ 'read', 'edit' ], can => can([ 'read', 'write' ]) || can('edit'), true ],
+  [[ 'edit', 'write' ], can => can([ 'read', 'write' ]) || can('edit'), true ],
+  [[ 'read', 'edit', 'write' ], can => can([ 'read', 'write' ]) || can('edit'), true ],
+];
+
+exports.checkCases = checkCases;

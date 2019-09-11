@@ -8,9 +8,11 @@
   "keywords": [
     "egg",
     "eggPlugin",
-    "egg-plugin"
+    "egg-plugin",
+    "authenticate and permission check"
   ],
   "dependencies": {
+    "egg-passport": "^2.1.0",
     "egg-tiaozhan-controller-extension": "^1.0.0",
     "reflect-metadata": "^0.1.13"
   },

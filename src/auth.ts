@@ -20,7 +20,6 @@ interface AllAuthMiddlewareProcess {
   onInvalidSymbol: AuthMiddlewareProcess;
   onNoPermission: AuthMiddlewareProcess;
 }
-// type MessageBuilderType = 'MissRoute' | 'NotLogin' | 'InvalidSymbol' | 'NoPermission';
 
 const allDefaultMessageBuilder: AllMessageBuilder = {
   onPass: (_: Context) => 'Auth pass',

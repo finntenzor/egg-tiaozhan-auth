@@ -3,9 +3,11 @@
 const mock = require('egg-mock');
 const HomeController = require('./fixtures/apps/main/app/controller/home');
 const assert = require('assert');
-const Dependency = require('./util').Dependency;
-const tiaozhanAuth = require('../dist');
+const util = require('./util');
+const Dependency = util.Dependency;
+const checkCases = util.checkCases;
 
+const tiaozhanAuth = require('../dist');
 const setAttrs = tiaozhanAuth.setAttrs;
 const getAttrs = tiaozhanAuth.getAttrs;
 const addAttrs = tiaozhanAuth.addAttrs;
@@ -16,8 +18,10 @@ const checkHasAuth = tiaozhanAuth.checkHasAuth;
 const checkCanPass = tiaozhanAuth.checkCanPass;
 const GuardStatus = tiaozhanAuth.GuardStatus;
 
-describe('test/main.test.js', () => {
+describe.skip('test/basic.test.js', () => {
   let app;
+  const dep = new Dependency();
+
   before(() => {
     app = mock.app({
       baseDir: 'apps/main',
@@ -27,8 +31,6 @@ describe('test/main.test.js', () => {
 
   after(() => app.close());
   afterEach(mock.restore);
-
-  const dep = new Dependency();
 
   describe('#Router', () => {
     dep.register('Router');
@@ -147,56 +149,36 @@ describe('test/main.test.js', () => {
     });
   });
 
-  const checkCases = [
-    [[ 'read' ], 'read', true ],
-    [[], 'read', false ],
-    [[ 'read', 'write' ], [ 'read', 'write' ], true ],
-    [[ 'read' ], [ 'read', 'write' ], false ],
-    [[ 'write' ], [ 'read', 'write' ], false ],
-    [[], [ 'read', 'write' ], false ],
-    [[ 'read' ], can => can('read') || can('write'), true ],
-    [[ 'write' ], can => can('read') || can('write'), true ],
-    [[], can => can('read') || can('write'), false ],
-    [[ ], can => can([ 'read', 'write' ]) || can('edit'), false ],
-    [[ 'read' ], can => can([ 'read', 'write' ]) || can('edit'), false ],
-    [[ 'write' ], can => can([ 'read', 'write' ]) || can('edit'), false ],
-    [[ 'edit' ], can => can([ 'read', 'write' ]) || can('edit'), true ],
-    [[ 'read', 'write' ], can => can([ 'read', 'write' ]) || can('edit'), true ],
-    [[ 'read', 'edit' ], can => can([ 'read', 'write' ]) || can('edit'), true ],
-    [[ 'edit', 'write' ], can => can([ 'read', 'write' ]) || can('edit'), true ],
-    [[ 'read', 'edit', 'write' ], can => can([ 'read', 'write' ]) || can('edit'), true ],
-  ];
-
   describe('#Check 1', () => {
     let id = 1;
 
-    const build = (permissions, options, result) => {
+    const build = (permissions, auth, result) => {
       it('should be correct #' + id, () => {
-        assert(checkHasAuth(permissions, options) === result);
+        assert(checkHasAuth(permissions, auth) === result);
       });
       id++;
     };
 
-    for (const [ permissions, options, result ] of checkCases) {
-      build(permissions, options, result);
+    for (const [ permissions, auth, result ] of checkCases) {
+      build(permissions, auth, result);
     }
   });
 
   describe('#Check 2', () => {
     let ctx;
     let id = 1;
+    const options = {
+      skip: false,
+      userToPermissions: () => [],
+      onPass: 'pass',
+      onMissRoute: 'log',
+      onNotLogin: 'throw',
+      onInvalidSymbol: 'log',
+      onNoPermission: 'throw',
+    };
 
     before(() => {
       ctx = app.mockContext();
-      ctx.options = {
-        skip: false,
-        userToPermissions: () => [],
-        onPass: 'pass',
-        onMissRoute: 'log',
-        onNotLogin: 'throw',
-        onInvalidSymbol: 'log',
-        onNoPermission: 'throw',
-      };
     });
 
     afterEach(() => {
@@ -204,53 +186,49 @@ describe('test/main.test.js', () => {
     });
 
     it('should pass if no auth set', () => {
-      assert(checkCanPass(ctx.options, ctx) === GuardStatus.PASS);
+      assert(checkCanPass(options, ctx) === GuardStatus.PASS);
     });
 
     it('should pass if login', () => {
       ctx.isAuthenticated = () => true;
       setAuth(HomeController.prototype, 'index', tiaozhanAuth.LOGIN);
-      assert(checkCanPass(ctx.options, ctx) === GuardStatus.PASS);
+      assert(checkCanPass(options, ctx) === GuardStatus.PASS);
     });
 
     it('should not login if not login', () => {
       ctx.isAuthenticated = () => false;
       setAuth(HomeController.prototype, 'index', tiaozhanAuth.LOGIN);
-      assert(checkCanPass(ctx.options, ctx) === GuardStatus.NOT_LOGIN);
+      assert(checkCanPass(options, ctx) === GuardStatus.NOT_LOGIN);
     });
 
     it('should boom if invalid symbol', () => {
       ctx.isAuthenticated = () => true;
       setAuth(HomeController.prototype, 'index', Symbol('hello'));
-      assert(checkCanPass(ctx.options, ctx) === GuardStatus.INVALID_SYMBOL);
+      assert(checkCanPass(options, ctx) === GuardStatus.INVALID_SYMBOL);
     });
 
     it('should not login if not login 2', () => {
       ctx.isAuthenticated = () => false;
       setAuth(HomeController.prototype, 'index', 'read');
-      assert(checkCanPass(ctx.options, ctx) === GuardStatus.NOT_LOGIN);
+      assert(checkCanPass(options, ctx) === GuardStatus.NOT_LOGIN);
     });
 
-    const build = (permissions, options, result) => {
+    const build = (permissions, auth, result) => {
       it('should be correct #' + id, () => {
         ctx.isAuthenticated = () => true;
-        ctx.options.userToPermissions = () => permissions;
-        setAuth(HomeController.prototype, 'index', options);
+        options.userToPermissions = () => permissions;
+        setAuth(HomeController.prototype, 'index', auth);
         if (result) {
-          assert(checkCanPass(ctx.options, ctx) === GuardStatus.PASS);
+          assert(checkCanPass(options, ctx) === GuardStatus.PASS);
         } else {
-          assert(checkCanPass(ctx.options, ctx) === GuardStatus.NO_PERMISSION);
+          assert(checkCanPass(options, ctx) === GuardStatus.NO_PERMISSION);
         }
       });
       id++;
     };
 
-    for (const [ permissions, options, result ] of checkCases) {
-      build(permissions, options, result);
+    for (const [ permissions, auth, result ] of checkCases) {
+      build(permissions, auth, result);
     }
-  });
-
-  describe('#Auth', () => {
-
   });
 });
