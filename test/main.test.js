@@ -337,7 +337,11 @@ describe('test/main.test.js', () => {
       } else if (typeof strategy === 'function') {
         strategyText = strategy.toString().substr(0, 10) + '...';
       } else {
-        strategyText = JSON.stringify(strategy);
+        const copy = { ...strategy };
+        if (typeof copy.message === 'function') {
+          copy.message = copy.message.toString().substr(0, 10) + '...';
+        }
+        strategyText = JSON.stringify(copy);
       }
       it(`#${id} ${key} at ${strategyText}`, async () => {
         const options = {
@@ -372,58 +376,62 @@ describe('test/main.test.js', () => {
           Controller: HomeController,
           methodName: 'index',
         },
+        meta: 'tiaozhan',
       };
     };
 
     const suit = (key, status, messageReg) => {
-      build(key, 'pass', async process => {
-        let status = false;
-        await process(null, () => {
-          status = true;
-          return Promise.resolve();
+
+      const buildSimpleOrCommonTest = (strategyOrMessage, resultReg) => {
+        const strategyBuilder = type => (strategyOrMessage ? Object.assign({ type }, strategyOrMessage) : type);
+        build(key, strategyBuilder('pass'), async process => {
+          let status = false;
+          await process(null, () => {
+            status = true;
+            return Promise.resolve();
+          });
+
+          assert(status);
         });
 
-        assert(status);
-      });
+        build(key, strategyBuilder('log'), async process => {
+          let callLog = false;
+          let callNext = false;
+          let message;
+          await process(fackContext(msg => {
+            callLog = true;
+            message = msg;
+          }), () => {
+            callNext = true;
+            return Promise.resolve();
+          });
 
-      build(key, 'log', async process => {
-        let callLog = false;
-        let callNext = false;
-        let message;
-        await process(fackContext(msg => {
-          callLog = true;
-          message = msg;
-        }), () => {
-          callNext = true;
-          return Promise.resolve();
+          assert(callLog && callNext && resultReg.test(message));
         });
 
-        assert(callLog && callNext && messageReg.test(message));
-      });
+        build(key, strategyBuilder('throw'), async process => {
+          let hasThrow = false;
+          let message;
+          try {
+            await process(fackContext(null));
+          } catch (err) {
+            hasThrow = true;
+            message = err.message;
+          }
+          assert(hasThrow && resultReg.test(message));
+        });
 
-      build(key, 'throw', async process => {
-        let hasThrow = false;
-        let message;
-        try {
-          await process(fackContext(null));
-        } catch (err) {
-          hasThrow = true;
-          message = err.message;
-        }
-        assert(hasThrow && messageReg.test(message));
-      });
+        build(key, strategyBuilder('abort'), async process => {
+          const ctx = fackContext();
+          await process(ctx);
 
-      build(key, 'abort', async process => {
-        const ctx = fackContext();
-        await process(ctx);
+          assert(resultReg.test(ctx.body));
+          assert(ctx.status === status);
+        });
+      };
 
-        assert(messageReg.test(ctx.body));
-        assert(ctx.status === status);
-      });
-
-      (() => {
+      const buildMiddlewareTest = (cAuth, returns) => {
         const cCtx = fackContext();
-        const cAuth = [ 'read', 'write' ];
         const cNext = () => Promise.resolve();
         const status = {
           ctx: false,
@@ -435,7 +443,7 @@ describe('test/main.test.js', () => {
           status.ctx = ctx === cCtx;
           status.auth = auth === cAuth;
           status.next = next === cNext;
-          return 'tiaozhan';
+          return returns;
         };
 
         build(key, middleware, async process => {
@@ -445,33 +453,14 @@ describe('test/main.test.js', () => {
           assert(status.ctx && status.auth && status.next);
           assert(cCtx.body === 'tiaozhan');
         });
-      })();
+      };
 
-      (() => {
-        const cCtx = fackContext();
-        const cAuth = can => can('edit') || can([ 'read', 'write' ]);
-        const cNext = () => Promise.resolve();
-        const status = {
-          ctx: false,
-          auth: false,
-          next: false,
-        };
-
-        const middleware = (ctx, auth, next) => {
-          status.ctx = ctx === cCtx;
-          status.auth = auth === cAuth;
-          status.next = next === cNext;
-          return Promise.resolve('tiaozhan');
-        };
-
-        build(key, middleware, async process => {
-          setAuth(HomeController.prototype, 'index', cAuth);
-          await process(cCtx, cNext);
-
-          assert(status.ctx && status.auth && status.next);
-          assert(cCtx.body === 'tiaozhan');
-        });
-      })();
+      buildSimpleOrCommonTest(undefined, messageReg);
+      buildMiddlewareTest([ 'read', 'write' ], 'tiaozhan');
+      buildMiddlewareTest(can => can('edit') || can([ 'read', 'write' ]), Promise.resolve('tiaozhan'));
+      buildSimpleOrCommonTest({ message: undefined }, messageReg);
+      buildSimpleOrCommonTest({ message: 'Hello' }, /Hello/);
+      buildSimpleOrCommonTest({ message: ctx => 'Hello ' + ctx.meta }, /Hello tiaozhan/);
     };
 
     suit('onPass', 500, /Auth pass/);
