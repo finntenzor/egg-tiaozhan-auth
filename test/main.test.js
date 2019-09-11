@@ -326,7 +326,6 @@ describe('test/main.test.js', () => {
   });
 
   describe('#Build All Process', () => {
-    dep.register('Build All Process');
     let id = 0;
 
     const build = (key, strategy, callback) => {
@@ -380,8 +379,8 @@ describe('test/main.test.js', () => {
       };
     };
 
-    const suit = (key, status, messageReg) => {
-
+    let _suitLast;
+    const suit = (key, status, messageReg, isLast = false) => {
       const buildSimpleOrCommonTest = (strategyOrMessage, resultReg) => {
         const strategyBuilder = type => (strategyOrMessage ? Object.assign({ type }, strategyOrMessage) : type);
         build(key, strategyBuilder('pass'), async process => {
@@ -455,12 +454,52 @@ describe('test/main.test.js', () => {
         });
       };
 
-      buildSimpleOrCommonTest(undefined, messageReg);
-      buildMiddlewareTest([ 'read', 'write' ], 'tiaozhan');
-      buildMiddlewareTest(can => can('edit') || can([ 'read', 'write' ]), Promise.resolve('tiaozhan'));
-      buildSimpleOrCommonTest({ message: undefined }, messageReg);
-      buildSimpleOrCommonTest({ message: 'Hello' }, /Hello/);
-      buildSimpleOrCommonTest({ message: ctx => 'Hello ' + ctx.meta }, /Hello tiaozhan/);
+      const buildCallbakTest = (messageOption, resultReg, cAuth, isBody) => {
+        const options = {
+          type: 'callback',
+          message: messageOption,
+          callback: (ctx, auth, message) => {
+            const body = {
+              auth,
+              message,
+            };
+            if (isBody) {
+              ctx.body = body;
+            } else {
+              return body;
+            }
+          },
+        };
+        build(key, options, async process => {
+          const ctx = fackContext(null);
+          setAuth(HomeController.prototype, 'index', cAuth);
+          await process(ctx);
+          const body = ctx.body;
+          assert(body);
+          assert(resultReg.test(body.message));
+          assert(body.auth === cAuth);
+        });
+      };
+
+      describe('#Suit ' + key, () => {
+        if (_suitLast) {
+          dep.need('Suit ' + _suitLast);
+        }
+        dep.register('Suit ' + key);
+        if (isLast) {
+          dep.register('Build All Process');
+        }
+        _suitLast = key;
+        buildSimpleOrCommonTest(undefined, messageReg);
+        buildMiddlewareTest([ 'read', 'write' ], 'tiaozhan');
+        buildMiddlewareTest(can => can('edit') || can([ 'read', 'write' ]), Promise.resolve('tiaozhan'));
+        buildSimpleOrCommonTest({ message: undefined }, messageReg);
+        buildSimpleOrCommonTest({ message: 'Hello' }, /Hello/);
+        buildSimpleOrCommonTest({ message: ctx => 'Hello ' + ctx.meta }, /Hello tiaozhan/);
+        buildCallbakTest(undefined, messageReg, 'read', true);
+        buildCallbakTest('Hello', /Hello/, [ 'read', 'write' ], true);
+        buildCallbakTest(ctx => 'Hello ' + ctx.meta, /Hello tiaozhan/, can => can('edit') || can([ 'read', 'write' ]), false);
+      });
     };
 
     suit('onPass', 500, /Auth pass/);
