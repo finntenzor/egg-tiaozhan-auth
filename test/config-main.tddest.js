@@ -5,66 +5,40 @@ const HomeController = require('./fixtures/apps/main/app/controller/home');
 const assert = require('assert');
 const util = require('./util');
 const Dependency = util.Dependency;
-const checkCases = util.checkCases;
 
 const tiaozhanAuth = require('../dist');
 const setAuth = tiaozhanAuth.setAuth;
 
-describe('test/config.test.js', () => {
+describe('test/config-main.test.js', () => {
   let app;
-  let setConfig;
-  let getConfig;
   const dep = new Dependency();
-  before(async () => {
+
+  before(() => {
     app = mock.app({
       baseDir: 'apps/main',
+      tiaozhanAuth: {
+        skip: true,
+        userToPermissions: (ctx, user) => {
+          console.log('[i think you are fucking kidding me]', user);
+          if (!user) {
+            return [];
+          }
+          return user.permissions;
+        },
+        onPass: 'pass',
+        onMissRoute: 'log',
+        onNotLogin: 'throw',
+        onInvalidSymbol: 'log',
+        onNoPermission: 'throw',
+      },
     });
-    await app.ready();
-    setConfig = (key, value) => {
-      app.config.tiaozhanAuth[key] = value;
-    };
-    getConfig = key => app.config.tiaozhanAuth[key];
-    setConfig('userToPermissions', (ctx, user) => {
-      return user ? user.permissions : [];
-    });
+    return app.ready();
   });
-
   after(() => app.close());
   afterEach(mock.restore);
 
-  describe.skip('#Skip', () => {
-    dep.register('Skip');
-    let id = 1;
-    const build = (permissions, auth) => {
-      it('should pass #' + id, async () => {
-        setConfig('userToPermissions', () => permissions);
-        setConfig('skip', true);
-        setAuth(HomeController.prototype, 'index', auth);
-
-        const response = await app.httpRequest().get('/');
-        const text = response.text;
-        const status = response.status;
-
-        assert(text);
-        assert(text === 'hi, tiaozhanAuth');
-        assert(status === 200);
-      });
-      id++;
-    };
-
-    for (const [ permissions, auth ] of checkCases) {
-      build(permissions, auth);
-    }
-  });
-
   describe('#Permission Mock', () => {
     dep.register('Permission Mock');
-
-    beforeEach(async () => {
-      setConfig('userToPermissions', (ctx, user) => {
-        return user ? user.permissions : [];
-      });
-    });
 
     it('should can mock', () => {
       assert(app.mockUser);
@@ -75,7 +49,7 @@ describe('test/config.test.js', () => {
       const ctx = app.mockUserContext({
         permissions: [ 'read', 'write' ],
       });
-      const permissions = getConfig('userToPermissions')(ctx, ctx.user);
+      const permissions = app.options.tiaozhanAuth.userToPermissions(ctx, ctx.user);
 
       assert(permissions);
       assert(permissions.length === 2);
@@ -90,19 +64,16 @@ describe('test/config.test.js', () => {
 
     const request = () => app.httpRequest().get('/');
 
-    beforeEach(async () => {
+    before(async () => {
       assert(app.mockUser);
       app.mockUser({
         permissions: [ 'read' ],
       });
       setAuth(HomeController.prototype, 'index', 'read');
-      setConfig('userToPermissions', (ctx, user) => {
-        return user ? user.permissions : [];
-      });
     });
 
     it('should pass if set pass', async () => {
-      setConfig('onPass', 'pass');
+      app.options.tiaozhanAuth.onPass = 'pass';
       const response = await request();
 
       assert(response);
@@ -111,7 +82,7 @@ describe('test/config.test.js', () => {
     });
 
     it('should log if set log', async () => {
-      setConfig('onPass', 'log');
+      app.options.tiaozhanAuth.onPass = 'log';
       await request();
       app.expectLog('Auth pass');
     });

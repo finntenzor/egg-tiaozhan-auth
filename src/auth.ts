@@ -178,27 +178,46 @@ function buildAllProcess(options: TiaozhanAuthConfig): AllAuthMiddlewareProcess 
 }
 
 /**
+ * 静态权限检查中间件，不能直接使用。
+ * @param process 所有分支的处理逻辑
+ * @param options 当前配置
+ * @param ctx 请求上下文
+ * @param next next
+ */
+function staticAuthMiddlware(process: AllAuthMiddlewareProcess, options: TiaozhanAuthConfig, ctx: Context, next: () => Promise<any>): Promise<void> {
+  // 如果配置要求跳过权限检查，直接通过
+  if (options.skip) {
+    return next();
+  }
+  // 其他情况检查通过状况，并执行对应逻辑
+  switch (checkCanPass(options, ctx)) {
+    case GuardStatus.PASS:
+      return process.onPass(ctx, next);
+    case GuardStatus.MISS_ROUTE:
+      return process.onMissRoute(ctx, next);
+    case GuardStatus.NOT_LOGIN:
+      return process.onNotLogin(ctx, next);
+    case GuardStatus.INVALID_SYMBOL:
+      return process.onInvalidSymbol(ctx, next);
+    case GuardStatus.NO_PERMISSION:
+      return process.onNoPermission(ctx, next);
+  }
+}
+
+/**
  * 创建插件
  * @param options 插件配置
  */
 export function buildMiddleware(options: TiaozhanAuthConfig) {
-  const process = buildAllProcess(options);
-  return function tiaozhanAuthMiddleware(ctx: Context, next: () => Promise<any>): Promise<void> {
-    // 如果配置要求跳过权限检查，直接通过
-    if (options.skip) {
-      return next();
-    }
-    switch (checkCanPass(options, ctx)) {
-      case GuardStatus.PASS:
-        return process.onPass(ctx, next);
-      case GuardStatus.MISS_ROUTE:
-        return process.onMissRoute(ctx, next);
-      case GuardStatus.NOT_LOGIN:
-        return process.onNotLogin(ctx, next);
-      case GuardStatus.INVALID_SYMBOL:
-        return process.onInvalidSymbol(ctx, next);
-      case GuardStatus.NO_PERMISSION:
-        return process.onNoPermission(ctx, next);
-    }
-  };
+  if (options.alwaysReloadConfig) {
+    const process = buildAllProcess(options);
+    return function tiaozhanAuthMiddleware(ctx: Context, next: () => Promise<any>): Promise<void> {
+      return staticAuthMiddlware(process, options, ctx, next);
+    };
+  } else {
+    return function tiaozhanAuthMiddleware(ctx: Context, next: () => Promise<any>): Promise<void> {
+      const process = buildAllProcess(options);
+      return staticAuthMiddlware(process, options, ctx, next);
+    };
+  }
 }

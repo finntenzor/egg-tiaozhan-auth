@@ -27,6 +27,7 @@ declare module 'egg' {
     match: IgnoreOrMatch;
     skip: boolean;
     userToPermissions: UserToPermissions;
+    alwaysReloadConfig: boolean;
     onPass: GuardStrategy;
     onMissRoute: GuardStrategy;
     onNotLogin: GuardStrategy;

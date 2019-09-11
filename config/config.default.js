@@ -7,7 +7,10 @@
  */
 exports.tiaozhanAuth = {
   skip: false,
-  userToPermissions: () => [],
+  userToPermissions: () => {
+    throw new Error('You have to implements your own `userToPermissions` function.');
+  },
+  alwaysReloadConfig: false,
   onPass: 'pass',
   onMissRoute: 'log',
   onNotLogin: 'throw',
