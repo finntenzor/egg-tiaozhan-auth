@@ -58,6 +58,17 @@ function buildProcessThrow(builder: MessageBuilder): AuthMiddlewareProcess {
 }
 
 /**
+ * 创建一个Abort处理逻辑
+ * @param builder MessageBuilder
+ */
+function buildProcessAbort(builder: MessageBuilder, defaultStatus: number = 500): AuthMiddlewareProcess {
+  return async (ctx: Context, _: () => Promise<any>) => {
+    ctx.body = builder(ctx);
+    ctx.status = defaultStatus;
+  };
+}
+
+/**
  * 创建一个Callback处理逻辑
  * @param callback 自定义callback
  * @param builder MessageBuilder
@@ -120,14 +131,17 @@ function formatMessageBuilder(message: GuardMessageBuilder | void): MessageBuild
  * 创建处理逻辑，接受pass、log、throw、middleware、commonStrategy或CallbackStrategy
  * @param strategy 守护策略
  * @param defaultMessageBuilder MessageBuilder
+ * @param defaultStatus 默认响应代码
  */
-function buildProcess(strategy: GuardStrategy, defaultMessageBuilder: MessageBuilder): AuthMiddlewareProcess {
+function buildProcess(strategy: GuardStrategy, defaultMessageBuilder: MessageBuilder, defaultStatus: number = 500): AuthMiddlewareProcess {
   if (strategy === 'pass') {
     return processPass;
   } else if (strategy === 'log') {
     return buildProcessLog(defaultMessageBuilder);
   } else if (strategy === 'throw') {
     return buildProcessThrow(defaultMessageBuilder);
+  } else if (strategy === 'abort') {
+    return buildProcessAbort(defaultMessageBuilder, defaultStatus);
   } else if (typeof strategy === 'function') {
     return buildProcessMiddleware(strategy);
   } else if (strategy.type === 'callback') {
@@ -143,6 +157,8 @@ function buildProcess(strategy: GuardStrategy, defaultMessageBuilder: MessageBui
         return buildProcessLog(builder);
       } else if (strategy.type === 'throw') {
         return buildProcessThrow(builder);
+      } else if (strategy.type === 'abort') {
+        return buildProcessAbort(builder, defaultStatus);
       } else {
         throw new AuthError('Unexpected strategy');
       }
@@ -154,9 +170,9 @@ function buildAllProcess(options: TiaozhanAuthConfig): AllAuthMiddlewareProcess 
   const process = {
     onPass: buildProcess(options.onPass, allDefaultMessageBuilder.onPass),
     onMissRoute: buildProcess(options.onMissRoute, allDefaultMessageBuilder.onMissRoute),
-    onNotLogin: buildProcess(options.onNotLogin, allDefaultMessageBuilder.onNotLogin),
+    onNotLogin: buildProcess(options.onNotLogin, allDefaultMessageBuilder.onNotLogin, 401),
     onInvalidSymbol: buildProcess(options.onInvalidSymbol, allDefaultMessageBuilder.onInvalidSymbol),
-    onNoPermission: buildProcess(options.onNoPermission, allDefaultMessageBuilder.onNoPermission),
+    onNoPermission: buildProcess(options.onNoPermission, allDefaultMessageBuilder.onNoPermission, 403),
   };
   return process as AllAuthMiddlewareProcess;
 }

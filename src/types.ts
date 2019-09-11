@@ -5,7 +5,7 @@ export declare type Can = (permission: string | string[]) => boolean;
 export declare type AuthCheckOptions = string | string[] | ((can: Can) => boolean);
 export declare type AuthOptions = AuthCheckOptions | symbol;
 
-export declare type GuardSimpleStrategy = 'pass' | 'log' | 'throw';
+export declare type GuardSimpleStrategy = 'pass' | 'log' | 'throw' | 'abort';
 export declare type GuardMiddlewareStrategy = (ctx: Context, auth: AuthOptions | null, next: () => Promise<any>) => any;
 export declare type GuardCallback = (ctx: Context, auth: AuthOptions | null, message: string) => any;
 export declare type GuardMessageBuilder = string | ((ctx: Context, auth: AuthOptions | null) => string);
