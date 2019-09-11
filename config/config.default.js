@@ -12,8 +12,8 @@ exports.tiaozhanAuth = {
   },
   alwaysReloadConfig: false,
   onPass: 'pass',
-  onMissRoute: 'log',
-  onNotLogin: 'throw',
-  onInvalidSymbol: 'log',
-  onNoPermission: 'throw',
+  onMissRoute: 'throw',
+  onNotLogin: 'abort',
+  onInvalidSymbol: 'throw',
+  onNoPermission: 'abort',
 };

@@ -184,7 +184,7 @@ function buildAllProcess(options: TiaozhanAuthConfig): AllAuthMiddlewareProcess 
  * @param ctx 请求上下文
  * @param next next
  */
-function staticAuthMiddlware(process: AllAuthMiddlewareProcess, options: TiaozhanAuthConfig, ctx: Context, next: () => Promise<any>): Promise<void> {
+export function staticAuthMiddlware(process: AllAuthMiddlewareProcess, options: TiaozhanAuthConfig, ctx: Context, next: () => Promise<any>): Promise<void> {
   // 如果配置要求跳过权限检查，直接通过
   if (options.skip) {
     return next();
@@ -210,13 +210,15 @@ function staticAuthMiddlware(process: AllAuthMiddlewareProcess, options: Tiaozha
  */
 export function buildMiddleware(options: TiaozhanAuthConfig) {
   if (options.alwaysReloadConfig) {
-    const process = buildAllProcess(options);
     return function tiaozhanAuthMiddleware(ctx: Context, next: () => Promise<any>): Promise<void> {
+      // 每次都重新生成process
+      const process = buildAllProcess(options);
       return staticAuthMiddlware(process, options, ctx, next);
     };
   } else {
+    // 只加载第一次生成process，之后不再修改
+    const process = buildAllProcess(options);
     return function tiaozhanAuthMiddleware(ctx: Context, next: () => Promise<any>): Promise<void> {
-      const process = buildAllProcess(options);
       return staticAuthMiddlware(process, options, ctx, next);
     };
   }

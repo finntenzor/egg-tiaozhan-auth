@@ -18,7 +18,7 @@ const checkHasAuth = tiaozhanAuth.checkHasAuth;
 const checkCanPass = tiaozhanAuth.checkCanPass;
 const GuardStatus = tiaozhanAuth.GuardStatus;
 
-describe.skip('test/basic.test.js', () => {
+describe('test/basic.test.js', () => {
   let app;
   const dep = new Dependency();
 
