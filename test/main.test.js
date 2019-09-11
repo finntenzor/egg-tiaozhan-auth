@@ -506,7 +506,7 @@ describe('test/main.test.js', () => {
     suit('onMissRoute', 500, /has no route/);
     suit('onNotLogin', 401, /not logined/);
     suit('onInvalidSymbol', 500, /Invalid Symbol/);
-    suit('onNoPermission', 403, /no perrmission/);
+    suit('onNoPermission', 403, /no perrmission/, true);
   });
 
   describe('#Static Auth Middleware Correct Branch', () => {
@@ -581,5 +581,78 @@ describe('test/main.test.js', () => {
     for (const [ ctx, auth, key ] of cases) {
       build(ctx, auth, key);
     }
+  });
+
+  describe('#Test Middleware', () => {
+    before(() => {
+      Object.assign(app.config.tiaozhanAuth, {
+        skip: false,
+        userToPermissions: (_, user) => {
+          return user.permissions;
+        },
+        alwaysReloadConfig: true,
+        onPass: 'pass',
+        onMissRoute: 'abort',
+        onNotLogin: 'abort',
+        onInvalidSymbol: 'abort',
+        onNoPermission: 'abort',
+      });
+    });
+    afterEach(() => {
+      setAuth(HomeController.prototype, 'index', undefined);
+    });
+    describe('#Pass', () => {
+      before(() => {
+        app.mockUser({
+          permissions: [ 'read' ],
+        });
+        setAuth(HomeController.prototype, 'index', 'read');
+      });
+      it('should pass', async () => {
+        const { status, text } = await app.httpRequest().get('/');
+
+        assert(/tiaozhan/.test(text));
+        assert(status === 200);
+      });
+    });
+
+    describe('#NotLogin', () => {
+      before(() => {
+        setAuth(HomeController.prototype, 'index', 'read');
+      });
+      it('should miss route', async () => {
+        const { status, text } = await app.httpRequest().get('/');
+
+        assert(/not logined/.test(text));
+        assert(status === 401);
+      });
+    });
+
+    describe('#InvalidSymbol', () => {
+      before(() => {
+        setAuth(HomeController.prototype, 'index', Symbol('hello'));
+      });
+      it('should miss route', async () => {
+        const { status, text } = await app.httpRequest().get('/');
+
+        assert(/Invalid Symbol/.test(text));
+        assert(status === 500);
+      });
+    });
+
+    describe('#NoPermission', () => {
+      before(() => {
+        app.mockUser({
+          permissions: [],
+        });
+        setAuth(HomeController.prototype, 'index', 'read');
+      });
+      it('should miss route', async () => {
+        const { status, text } = await app.httpRequest().get('/');
+
+        assert(/no perrmission/.test(text));
+        assert(status === 403);
+      });
+    });
   });
 });
