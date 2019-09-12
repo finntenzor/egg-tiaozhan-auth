@@ -62,6 +62,29 @@ const checkCases = [
 
 exports.checkCases = checkCases;
 
+const tsCheckCases = [
+  [ '/', [ 'read' ], true ],
+  [ '/', [], false ],
+  [ '/readAndWrite', [ 'read', 'write' ], true ],
+  [ '/readAndWrite', [ 'read' ], false ],
+  [ '/readAndWrite', [ 'write' ], false ],
+  [ '/readAndWrite', [], false ],
+  [ '/readOrWrite', [ 'read', 'write' ], true ],
+  [ '/readOrWrite', [ 'read' ], true ],
+  [ '/readOrWrite', [ 'write' ], true ],
+  [ '/readOrWrite', [], false ],
+  [ '/readAndWriteOrEdit', [ ], false ],
+  [ '/readAndWriteOrEdit', [ 'read' ], false ],
+  [ '/readAndWriteOrEdit', [ 'write' ], false ],
+  [ '/readAndWriteOrEdit', [ 'edit' ], true ],
+  [ '/readAndWriteOrEdit', [ 'read', 'write' ], true ],
+  [ '/readAndWriteOrEdit', [ 'read', 'edit' ], true ],
+  [ '/readAndWriteOrEdit', [ 'edit', 'write' ], true ],
+  [ '/readAndWriteOrEdit', [ 'read', 'edit', 'write' ], true ],
+];
+
+exports.tsCheckCases = tsCheckCases;
+
 const fackRoute = {
   Controller: HomeController,
   methodName: 'index',
@@ -79,5 +102,3 @@ const staticMiddlwareCases = [
 ];
 
 exports.staticMiddlwareCases = staticMiddlwareCases;
-
-exports.dep = new Dependency();

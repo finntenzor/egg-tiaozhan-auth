@@ -20,7 +20,7 @@ const buildAllProcess = tiaozhanAuth.buildAllProcess;
 
 describe('test/main.test.js', () => {
   let app;
-  const dep = util.dep;
+  const dep = new util.Dependency();
 
   before(async () => {
     app = mock.app({
@@ -506,7 +506,7 @@ describe('test/main.test.js', () => {
     suit('onMissRoute', 500, /has no route/);
     suit('onNotLogin', 401, /not logined/);
     suit('onInvalidSymbol', 500, /Invalid Symbol/);
-    suit('onNoPermission', 403, /no perrmission/, true);
+    suit('onNoPermission', 403, /no permission/, true);
   });
 
   describe('#Static Auth Middleware Correct Branch', () => {
@@ -602,6 +602,8 @@ describe('test/main.test.js', () => {
       setAuth(HomeController.prototype, 'index', undefined);
     });
     describe('#Pass', () => {
+      dep.need('Static Auth Middleware Correct Branch');
+      dep.register('Test Middleware Pass');
       before(() => {
         app.mockUser({
           permissions: [ 'read' ],
@@ -617,6 +619,8 @@ describe('test/main.test.js', () => {
     });
 
     describe('#NotLogin', () => {
+      dep.need('Test Middleware Pass');
+      dep.register('Test Middleware NotLogin');
       before(() => {
         setAuth(HomeController.prototype, 'index', 'read');
       });
@@ -629,6 +633,8 @@ describe('test/main.test.js', () => {
     });
 
     describe('#InvalidSymbol', () => {
+      dep.need('Test Middleware NotLogin');
+      dep.register('Test Middleware InvalidSymbol');
       before(() => {
         setAuth(HomeController.prototype, 'index', Symbol('hello'));
       });
@@ -641,6 +647,9 @@ describe('test/main.test.js', () => {
     });
 
     describe('#NoPermission', () => {
+      dep.need('Test Middleware InvalidSymbol');
+      dep.register('Test Middleware NoPermission');
+      dep.register('Test Middleware');
       before(() => {
         app.mockUser({
           permissions: [],
@@ -650,7 +659,7 @@ describe('test/main.test.js', () => {
       it('should miss route', async () => {
         const { status, text } = await app.httpRequest().get('/');
 
-        assert(/no perrmission/.test(text));
+        assert(/no permission/.test(text));
         assert(status === 403);
       });
     });

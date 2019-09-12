@@ -26,7 +26,7 @@ const allDefaultMessageBuilder: AllMessageBuilder = {
   onMissRoute: (ctx: Context) => `request [${ctx.request.path}] has no route!`,
   onNotLogin: (_: Context) => 'You are not logined!',
   onInvalidSymbol: (ctx: Context) => `Invalid Symbol ` + (getAuthFromRoute(ctx.currentRoute as Route) as symbol).toString(),
-  onNoPermission: (_: Context) => 'You have no perrmission!',
+  onNoPermission: (_: Context) => 'You have no permission!',
 };
 
 /**
