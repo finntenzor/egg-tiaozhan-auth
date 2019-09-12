@@ -1,6 +1,6 @@
 {
   "name": "egg-tiaozhan-auth",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Auth control by annotation and middleware",
   "eggPlugin": {
     "name": "tiaozhanAuth"
@@ -43,10 +43,12 @@
     "autod": "autod"
   },
   "files": [
-    "app.js",
-    "agent.js",
+    "app/middleware/",
     "config",
-    "app"
+    "dist/*.js",
+    "dist/*.d.ts",
+    "app.js",
+    "index.d.ts"
   ],
   "ci": {
     "version": "8, 10"
